@@ -1,72 +1,79 @@
 import os
 import streamlit as st
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
 import requests
-from langchain.chat_models import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage
+from datetime import datetime
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
 
-# Load API keys
+# Load from .env (for local testing)
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
-# LangChain LLM Setup
+# Use Streamlit secrets for deployed environments
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", st.secrets.get("GOOGLE_API_KEY", ""))
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", st.secrets.get("GEMINI_API_KEY", ""))
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", st.secrets.get("OPENWEATHER_API_KEY", ""))
+
+# Initialize Gemini
 llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=GEMINI_API_KEY)
 
-# Streamlit fancy UI
-st.set_page_config(page_title="AI Trip Planner", layout="wide")
-st.markdown("""
-    <style>
-    .main { background-color: #f9f9f9; }
-    .title { font-size:36px; font-weight:bold; color:#2c3e50; }
-    .section { background-color: white; padding:20px; border-radius:15px; margin-top:20px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
-    </style>
-""", unsafe_allow_html=True)
+# Streamlit UI
+st.set_page_config(page_title="✈️ AI Trip Planner", layout="centered")
+st.markdown("<h1 style='text-align: center;'>🧳 AI-Powered Trip Planner</h1>", unsafe_allow_html=True)
 
-st.markdown("<div class='title'>✈️ AI Trip Planner</div>", unsafe_allow_html=True)
+# User Inputs
+city = st.text_input("🌍 Enter Destination City (e.g. Tokyo)", "Tokyo")
+start_date = st.date_input("🗓️ Start Date", datetime(2025, 1, 16))
+end_date = st.date_input("🗓️ End Date", datetime(2025, 1, 18))
 
-# Input
-city = st.text_input("Enter city (e.g., Tokyo)", value="Tokyo")
-days = st.slider("Trip duration (in days)", min_value=1, max_value=10, value=3)
-month = st.selectbox("Select month", ["April", "May", "June", "July", "August"])
-submit = st.button("Plan My Trip!")
-
-# Helper Functions
+# Fetch Weather
 def get_weather(city):
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-    r = requests.get(url)
-    data = r.json()
-    if "main" in data:
-        return f"{data['weather'][0]['description'].capitalize()}, {data['main']['temp']}°C"
-    return "Weather info unavailable"
+    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        return f"{data['weather'][0]['description'].title()}, {data['main']['temp']}°C"
+    return "❌ Unable to fetch weather data."
 
+# Fetch Google Places
 def get_places(city):
-    url = f"https://maps.googleapis.com/maps/api/place/textsearch/json?query=tourist+attractions+in+{city}&key={GOOGLE_API_KEY}"
-    r = requests.get(url)
-    data = r.json()
-    places = [place["name"] for place in data.get("results", [])[:5]]
-    return places if places else ["No data found"]
+    url = f"https://maps.googleapis.com/maps/api/place/textsearch/json?query=top+attractions+in+{city}&key={GOOGLE_API_KEY}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        places = response.json().get("results", [])[:5]
+        return [place["name"] for place in places]
+    return []
 
-# Main Logic
-if submit:
-    start_date = datetime(2025, list(["January", "February", "March", "April", "May", "June", "July", "August"]).index(month) + 1, 16)
-    end_date = start_date + timedelta(days=days - 1)
+# Generate Itinerary Suggestions
+def generate_itinerary(city, start_date, end_date, places):
+    prompt = f"""
+    I am planning a trip to {city} from {start_date} to {end_date}.
+    Can you suggest a 3-day itinerary including these attractions:
+    {', '.join(places)}? Include morning, afternoon, and evening plans each day.
+    """
+    return llm.invoke([HumanMessage(content=prompt)]).content
 
-    with st.spinner("Talking to Gemini..."):
-        city_info = llm([HumanMessage(content=f"Tell me about the cultural and historical significance of {city}.")]).content
-
+# Display Results
+if st.button("🚀 Plan My Trip"):
+    st.markdown(f"### 🗓️ Travel Dates\n{start_date.strftime('%B %d, %Y')} to {end_date.strftime('%B %d, %Y')}")
+    
+    # Weather
     weather = get_weather(city)
+    st.markdown(f"### ☁️ Current Weather\n{weather}")
+    
+    # Places
     places = get_places(city)
+    if places:
+        st.markdown("### 🌟 Top 5 Attractions")
+        for i, place in enumerate(places, 1):
+            st.write(f"{i}. {place}")
+    else:
+        st.markdown("### 🌟 Top 5 Attractions\n❌ No places data found.")
 
-    # Display Results
-    st.markdown(f"<div class='section'><h3>🗓️ Travel Dates</h3>{start_date.strftime('%B %d, %Y')} to {end_date.strftime('%B %d, %Y')}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='section'><h3>🏙️ About {city}</h3>{city_info}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='section'><h3>☁️ Current Weather</h3>{weather}</div>", unsafe_allow_html=True)
-
-    st.markdown(f"<div class='section'><h3>🌟 Top Attractions in {city}</h3><ul>" + "".join([f"<li>{p}</li>" for p in places]) + "</ul></div>", unsafe_allow_html=True)
-
-    st.markdown(f"<div class='section'><h3>✈️ Flight Options</h3>Flights are available from major cities. Check Google Flights or Skyscanner for best deals.</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='section'><h3>🏨 Hotel Options</h3>Check Google Hotels, Booking.com, or Airbnb for accommodation near top attractions.</div>", unsafe_allow_html=True)
-
+    # Itinerary
+    if places:
+        st.markdown("### 📋 Suggested Itinerary")
+        itinerary = generate_itinerary(city, start_date, end_date, places)
+        st.write(itinerary)
+    else:
+        st.warning("Unable to generate itinerary without attractions.")
