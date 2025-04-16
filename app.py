@@ -10,9 +10,9 @@ from langchain_core.messages import HumanMessage
 load_dotenv()
 
 # Use Streamlit secrets for deployed environments
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", st.secrets.get("GOOGLE_API_KEY", ""))
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", st.secrets.get("GEMINI_API_KEY", ""))
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", st.secrets.get("OPENWEATHER_API_KEY", ""))
+OPENWEATHER_API_KEY = os.getenv("714ea86f8689ebafb30f12dd9c09cbaa")
+GOOGLE_API_KEY = os.getenv("AIzaSyDqztuqGS6N8ciIDlfWxW2CcuUQbFaXGfM")
+GEMINI_API_KEY = os.getenv("AIzaSyDqztuqGS6N8ciIDlfWxW2CcuUQbFaXGfM")
 
 # Initialize Gemini
 llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=GEMINI_API_KEY)
