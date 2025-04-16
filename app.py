@@ -1,104 +1,107 @@
 import streamlit as st
-import requests
-import google.generativeai as genai
-import os
-from datetime import datetime, timedelta
-from dotenv import load_dotenv
+import datetime
 
-# Load API keys
-load_dotenv()
-OPENWEATHER_API_KEY = os.getenv("714ea86f8689ebafb30f12dd9c09cbaa")
-GOOGLE_API_KEY = os.getenv("AIzaSyDqztuqGS6N8ciIDlfWxW2CcuUQbFaXGfM")
-GEMINI_API_KEY = os.getenv("AIzaSyDqztuqGS6N8ciIDlfWxW2CcuUQbFaXGfM")
+# Pre-loaded Data for Mocking API Responses
 
-# Configure Gemini
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-pro")
+# Mock Weather Data
+weather_data = {
+    "Tokyo": {
+        "current": "16°C, Clear Sky",
+        "forecast": "17°C to 19°C for the next 3 days"
+    },
+    "Udaipur": {
+        "current": "28°C, Sunny",
+        "forecast": "30°C to 32°C for the next 3 days"
+    }
+}
 
-# Styling
-st.set_page_config(page_title="Trip Planner", layout="wide")
-st.markdown("<h1 style='text-align: center; color: #00A6ED;'>🧳 AI Trip Planner</h1>", unsafe_allow_html=True)
-st.markdown("---")
+# Mock Flight Data
+flight_data = {
+    "Tokyo": [
+        {"flight": "Flight 1: Air India", "time": "10:30 AM", "price": "$500"},
+        {"flight": "Flight 2: Emirates", "time": "2:00 PM", "price": "$650"}
+    ],
+    "Udaipur": [
+        {"flight": "Flight 1: SpiceJet", "time": "7:00 AM", "price": "$150"},
+        {"flight": "Flight 2: Indigo", "time": "12:00 PM", "price": "$180"}
+    ]
+}
 
-# Function: Get Weather
-def get_weather(city):
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        desc = data['weather'][0]['description'].title()
-        temp = data['main']['temp']
-        return f"{desc}, {temp}°C"
-    return None
+# Mock Hotel Data
+hotel_data = {
+    "Tokyo": [
+        {"name": "Hotel Tokyo Bay", "price": "$150 per night", "rating": "4.5/5"},
+        {"name": "Shibuya Crossing Hotel", "price": "$180 per night", "rating": "4.7/5"}
+    ],
+    "Udaipur": [
+        {"name": "Lake Pichola Hotel", "price": "$120 per night", "rating": "4.8/5"},
+        {"name": "Udaipur Palace Hotel", "price": "$130 per night", "rating": "4.6/5"}
+    ]
+}
 
-# Function: Get Places
-def get_places(city):
-    url = f"https://maps.googleapis.com/maps/api/place/textsearch/json?query=tourist+attractions+in+{city}&key={GOOGLE_API_KEY}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        results = response.json().get("results", [])[:5]
-        return [place["name"] for place in results]
-    return None
+# Mock Google Places Data (Tourist Attractions)
+places_data = {
+    "Tokyo": ["Tokyo Tower", "Shibuya Crossing", "Meiji Shrine", "Asakusa Temple", "Odaiba"],
+    "Udaipur": ["Lake Pichola", "City Palace", "Jag Mandir", "Sajjangarh Palace", "Bagore Ki Haveli"]
+}
 
-# Function: Ask Gemini
-def ask_gemini(prompt):
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return "❌ Gemini LLM Error."
+# Define the Trip Planning function
+def plan_trip(city, days, month):
+    # Get city data
+    city_weather = weather_data.get(city, {"current": "Data not available", "forecast": "Data not available"})
+    city_flights = flight_data.get(city, [])
+    city_hotels = hotel_data.get(city, [])
+    city_places = places_data.get(city, [])
 
-# UI: Sidebar Inputs
-with st.sidebar:
-    st.markdown("## 📍 Trip Settings")
-    city = st.text_input("Destination City", "Tokyo")
-    days = st.slider("Number of Days", 1, 7, 3)
-    start_date = st.date_input("Trip Start Date", datetime.today())
-
-# Processing
-if st.button("Plan My Trip"):
-    end_date = start_date + timedelta(days=days - 1)
-    trip_range = f"{start_date.strftime('%B %d, %Y')} to {end_date.strftime('%B %d, %Y')}"
-    st.markdown(f"### 🗓️ Travel Dates\n{trip_range}")
-
-    # Weather
-    weather = get_weather(city)
-    if weather:
-        st.markdown(f"### ☁️ Current Weather\n{weather}")
+    # Display Trip Plan
+    st.write(f"### Trip Plan for {city}")
+    st.write(f"🗓️ **Travel Dates**: {days} days in {month}")
+    
+    # Weather Information
+    st.write(f"☁️ **Current Weather**: {city_weather['current']}")
+    st.write(f"🌤️ **Weather Forecast**: {city_weather['forecast']}")
+    
+    # Google Places (Top Attractions)
+    if city_places:
+        st.write("🌟 **Top 5 Attractions**:")
+        for place in city_places:
+            st.write(f"- {place}")
     else:
-        st.markdown("### ☁️ Current Weather\n❌ Unable to fetch weather data.")
-
-    # Places
-    places = get_places(city)
-    if places:
-        st.markdown("### 🌟 Top 5 Attractions")
-        for i, place in enumerate(places, 1):
-            st.markdown(f"{i}. {place}")
+        st.write("❌ No places data found.")
+    
+    # Flight Options
+    if city_flights:
+        st.write("✈️ **Flight Options**:")
+        for flight in city_flights:
+            st.write(f"- {flight['flight']} at {flight['time']}, Price: {flight['price']}")
     else:
-        st.markdown("### 🌟 Top 5 Attractions\n❌ No places data found.")
+        st.write("❌ No flight options found.")
+    
+    # Hotel Options
+    if city_hotels:
+        st.write("🏨 **Hotel Options**:")
+        for hotel in city_hotels:
+            st.write(f"- {hotel['name']}, Price: {hotel['price']}, Rating: {hotel['rating']}")
+    else:
+        st.write("❌ No hotel options found.")
 
-    # Gemini: City Summary & Itinerary
-    with st.spinner("🧠 Generating itinerary using Gemini..."):
-        prompt = (
-            f"Plan a {days}-day trip to {city}. Include:\n"
-            f"1 paragraph on its cultural and historical background,\n"
-            f"weather forecast for the trip between {trip_range},\n"
-            f"a suggested itinerary with must-visit attractions,\n"
-            f"hotel and flight suggestions.\n"
-            f"If possible, include things to eat and tips."
-        )
-        response = ask_gemini(prompt)
-        st.markdown("### 🧠 Trip Summary & Itinerary")
-        st.markdown(response)
+# Streamlit UI Setup
+def main():
+    st.title("Trip Planner App")
 
-    # Placeholder Flight/Hotel Info
-    st.markdown("### ✈️ Flight Options")
-    st.markdown("Flights are available from various international airports to this city. Please check Google Flights or Skyscanner.")
+    # City Input
+    city = st.selectbox("Select City", ["Tokyo", "Udaipur"])
+    
+    # Travel Days Input
+    days = st.number_input("Enter number of travel days", min_value=1, max_value=30, value=3)
+    
+    # Travel Month Input
+    month = st.text_input("Enter travel month", "May")
 
-    st.markdown("### 🏨 Hotel Options")
-    st.markdown("Several hotels are available. Please check Booking.com, Airbnb, or Trivago for best deals.")
+    # Button to generate trip plan
+    if st.button("Generate Trip Plan"):
+        plan_trip(city, days, month)
 
-# Footer
-st.markdown("---")
-st.markdown("<p style='text-align:center; font-size: 13px;'>Built with ❤️ using Gemini + Streamlit</p>", unsafe_allow_html=True)
+if __name__ == "__main__":
+    main()
 
