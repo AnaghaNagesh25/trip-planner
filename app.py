@@ -1,9 +1,6 @@
 import streamlit as st
-import datetime
 
-# Pre-loaded Data for Mocking API Responses
-
-# Mock Weather Data
+# Pre-loaded Mock Data for Weather, Flights, Hotels, Attractions, and Itinerary
 weather_data = {
     "Tokyo": {
         "current": "16°C, Clear Sky",
@@ -15,7 +12,6 @@ weather_data = {
     }
 }
 
-# Mock Flight Data
 flight_data = {
     "Tokyo": [
         {"flight": "Flight 1: Air India", "time": "10:30 AM", "price": "$500"},
@@ -27,7 +23,6 @@ flight_data = {
     ]
 }
 
-# Mock Hotel Data
 hotel_data = {
     "Tokyo": [
         {"name": "Hotel Tokyo Bay", "price": "$150 per night", "rating": "4.5/5"},
@@ -39,23 +34,39 @@ hotel_data = {
     ]
 }
 
-# Mock Google Places Data (Tourist Attractions)
 places_data = {
     "Tokyo": ["Tokyo Tower", "Shibuya Crossing", "Meiji Shrine", "Asakusa Temple", "Odaiba"],
     "Udaipur": ["Lake Pichola", "City Palace", "Jag Mandir", "Sajjangarh Palace", "Bagore Ki Haveli"]
 }
 
-# Define the Trip Planning function
-def plan_trip(city, days, month):
-    # Get city data
+itinerary_data = {
+    "Tokyo": {
+        "Day 1": "Visit the iconic Tokyo Tower, explore the bustling Shibuya Crossing.",
+        "Day 2": "Visit Meiji Shrine and explore the Odaiba area.",
+        "Day 3": "Tour Asakusa Temple and shopping at Ginza."
+    },
+    "Udaipur": {
+        "Day 1": "Explore the majestic City Palace and enjoy a boat ride on Lake Pichola.",
+        "Day 2": "Visit Jag Mandir and Sajjangarh Palace.",
+        "Day 3": "Explore Bagore Ki Haveli and the local markets."
+    }
+}
+
+# Function to Generate Trip Plan
+def generate_trip_plan(city, days, month):
     city_weather = weather_data.get(city, {"current": "Data not available", "forecast": "Data not available"})
     city_flights = flight_data.get(city, [])
     city_hotels = hotel_data.get(city, [])
     city_places = places_data.get(city, [])
-
-    # Display Trip Plan
+    city_itinerary = itinerary_data.get(city, {})
+    
+    # Displaying the Trip Plan
     st.write(f"### Trip Plan for {city}")
     st.write(f"🗓️ **Travel Dates**: {days} days in {month}")
+    
+    # City Cultural and Historical Significance
+    st.write(f"🏛️ **Cultural & Historic Significance**:")
+    st.write(f"The city of {city} is known for its rich culture and history. Explore the historic landmarks and vibrant culture during your stay.")
     
     # Weather Information
     st.write(f"☁️ **Current Weather**: {city_weather['current']}")
@@ -84,13 +95,18 @@ def plan_trip(city, days, month):
             st.write(f"- {hotel['name']}, Price: {hotel['price']}, Rating: {hotel['rating']}")
     else:
         st.write("❌ No hotel options found.")
-
+    
+    # Day-wise Itinerary
+    st.write("🗺️ **Day-wise Itinerary**:")
+    for day, plan in city_itinerary.items():
+        st.write(f"{day}: {plan}")
+    
 # Streamlit UI Setup
 def main():
     st.title("Trip Planner App")
 
-    # City Input
-    city = st.selectbox("Select City", ["Tokyo", "Udaipur"])
+    # City Input (User can input any city)
+    city = st.text_input("Enter City Name", "Tokyo")
     
     # Travel Days Input
     days = st.number_input("Enter number of travel days", min_value=1, max_value=30, value=3)
@@ -100,7 +116,7 @@ def main():
 
     # Button to generate trip plan
     if st.button("Generate Trip Plan"):
-        plan_trip(city, days, month)
+        generate_trip_plan(city, days, month)
 
 if __name__ == "__main__":
     main()
