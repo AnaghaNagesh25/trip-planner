@@ -96,10 +96,12 @@ def generate_trip_plan(city, days, month):
     else:
         st.write("❌ No hotel options found.")
     
-    # Day-wise Itinerary
+    # Day-wise Itinerary (Adjust based on number of days)
     st.write("🗺️ **Day-wise Itinerary**:")
-    for day, plan in city_itinerary.items():
-        st.write(f"{day}: {plan}")
+    days_in_itinerary = min(days, len(city_itinerary))  # Ensure itinerary doesn't exceed available days
+    for i in range(1, days_in_itinerary + 1):
+        day_plan = city_itinerary.get(f"Day {i}", "No plan available")
+        st.write(f"Day {i}: {day_plan}")
     
 # Streamlit UI Setup
 def main():
