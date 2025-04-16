@@ -25,16 +25,26 @@ def get_weather(city, api_key):
 # Function to get Google Places data (like popular attractions)
 def get_google_places(city, api_key):
     # Example: Fetching places near the city center (latitude, longitude)
-    # Use the latitude and longitude of the city, here we use a placeholder
-    # Example for Tokyo
-    lat, lon = 35.6762, 139.6503  # Tokyo's coordinates as an example
+    # Using Tokyo coordinates as placeholder, change it based on city if needed
+    coordinates = {
+        "Tokyo": (35.6762, 139.6503),
+        "New York": (40.7128, -74.0060),
+        "Paris": (48.8566, 2.3522)
+    }
+    
+    # Defaulting to Tokyo for testing if city is not found
+    lat, lon = coordinates.get(city, coordinates["Tokyo"])
+
     url = f"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={lat},{lon}&radius=5000&key={api_key}"
     
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
-        places = [place['name'] for place in data['results'][:5]]  # Get top 5 places
-        return places
+        if 'results' in data:
+            places = [place['name'] for place in data['results'][:5]]  # Get top 5 places
+            return places
+        else:
+            return []
     else:
         return []
 
