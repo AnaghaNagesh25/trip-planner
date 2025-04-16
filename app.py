@@ -1,79 +1,104 @@
-import os
 import streamlit as st
-from dotenv import load_dotenv
 import requests
-from datetime import datetime
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage
+import google.generativeai as genai
+import os
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
 
-# Load from .env (for local testing)
+# Load API keys
 load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
-# Use Streamlit secrets for deployed environments
-OPENWEATHER_API_KEY = os.getenv("714ea86f8689ebafb30f12dd9c09cbaa")
-GOOGLE_API_KEY = os.getenv("AIzaSyDqztuqGS6N8ciIDlfWxW2CcuUQbFaXGfM")
-GEMINI_API_KEY = os.getenv("AIzaSyDqztuqGS6N8ciIDlfWxW2CcuUQbFaXGfM")
+# Configure Gemini
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-pro")
 
-# Initialize Gemini
-llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=GEMINI_API_KEY)
+# Styling
+st.set_page_config(page_title="Trip Planner", layout="wide")
+st.markdown("<h1 style='text-align: center; color: #00A6ED;'>🧳 AI Trip Planner</h1>", unsafe_allow_html=True)
+st.markdown("---")
 
-# Streamlit UI
-st.set_page_config(page_title="✈️ AI Trip Planner", layout="centered")
-st.markdown("<h1 style='text-align: center;'>🧳 AI-Powered Trip Planner</h1>", unsafe_allow_html=True)
-
-# User Inputs
-city = st.text_input("🌍 Enter Destination City (e.g. Tokyo)", "Tokyo")
-start_date = st.date_input("🗓️ Start Date", datetime(2025, 1, 16))
-end_date = st.date_input("🗓️ End Date", datetime(2025, 1, 18))
-
-# Fetch Weather
+# Function: Get Weather
 def get_weather(city):
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
-        return f"{data['weather'][0]['description'].title()}, {data['main']['temp']}°C"
-    return "❌ Unable to fetch weather data."
+        desc = data['weather'][0]['description'].title()
+        temp = data['main']['temp']
+        return f"{desc}, {temp}°C"
+    return None
 
-# Fetch Google Places
+# Function: Get Places
 def get_places(city):
-    url = f"https://maps.googleapis.com/maps/api/place/textsearch/json?query=top+attractions+in+{city}&key={GOOGLE_API_KEY}"
+    url = f"https://maps.googleapis.com/maps/api/place/textsearch/json?query=tourist+attractions+in+{city}&key={GOOGLE_API_KEY}"
     response = requests.get(url)
     if response.status_code == 200:
-        places = response.json().get("results", [])[:5]
-        return [place["name"] for place in places]
-    return []
+        results = response.json().get("results", [])[:5]
+        return [place["name"] for place in results]
+    return None
 
-# Generate Itinerary Suggestions
-def generate_itinerary(city, start_date, end_date, places):
-    prompt = f"""
-    I am planning a trip to {city} from {start_date} to {end_date}.
-    Can you suggest a 3-day itinerary including these attractions:
-    {', '.join(places)}? Include morning, afternoon, and evening plans each day.
-    """
-    return llm.invoke([HumanMessage(content=prompt)]).content
+# Function: Ask Gemini
+def ask_gemini(prompt):
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return "❌ Gemini LLM Error."
 
-# Display Results
-if st.button("🚀 Plan My Trip"):
-    st.markdown(f"### 🗓️ Travel Dates\n{start_date.strftime('%B %d, %Y')} to {end_date.strftime('%B %d, %Y')}")
-    
+# UI: Sidebar Inputs
+with st.sidebar:
+    st.markdown("## 📍 Trip Settings")
+    city = st.text_input("Destination City", "Tokyo")
+    days = st.slider("Number of Days", 1, 7, 3)
+    start_date = st.date_input("Trip Start Date", datetime.today())
+
+# Processing
+if st.button("Plan My Trip"):
+    end_date = start_date + timedelta(days=days - 1)
+    trip_range = f"{start_date.strftime('%B %d, %Y')} to {end_date.strftime('%B %d, %Y')}"
+    st.markdown(f"### 🗓️ Travel Dates\n{trip_range}")
+
     # Weather
     weather = get_weather(city)
-    st.markdown(f"### ☁️ Current Weather\n{weather}")
-    
+    if weather:
+        st.markdown(f"### ☁️ Current Weather\n{weather}")
+    else:
+        st.markdown("### ☁️ Current Weather\n❌ Unable to fetch weather data.")
+
     # Places
     places = get_places(city)
     if places:
         st.markdown("### 🌟 Top 5 Attractions")
         for i, place in enumerate(places, 1):
-            st.write(f"{i}. {place}")
+            st.markdown(f"{i}. {place}")
     else:
         st.markdown("### 🌟 Top 5 Attractions\n❌ No places data found.")
 
-    # Itinerary
-    if places:
-        st.markdown("### 📋 Suggested Itinerary")
-        itinerary = generate_itinerary(city, start_date, end_date, places)
-        st.write(itinerary)
-    else:
-        st.warning("Unable to generate itinerary without attractions.")
+    # Gemini: City Summary & Itinerary
+    with st.spinner("🧠 Generating itinerary using Gemini..."):
+        prompt = (
+            f"Plan a {days}-day trip to {city}. Include:\n"
+            f"1 paragraph on its cultural and historical background,\n"
+            f"weather forecast for the trip between {trip_range},\n"
+            f"a suggested itinerary with must-visit attractions,\n"
+            f"hotel and flight suggestions.\n"
+            f"If possible, include things to eat and tips."
+        )
+        response = ask_gemini(prompt)
+        st.markdown("### 🧠 Trip Summary & Itinerary")
+        st.markdown(response)
+
+    # Placeholder Flight/Hotel Info
+    st.markdown("### ✈️ Flight Options")
+    st.markdown("Flights are available from various international airports to this city. Please check Google Flights or Skyscanner.")
+
+    st.markdown("### 🏨 Hotel Options")
+    st.markdown("Several hotels are available. Please check Booking.com, Airbnb, or Trivago for best deals.")
+
+# Footer
+st.markdown("---")
+st.markdown("<p style='text-align:center; font-size: 13px;'>Built with ❤️ using Gemini + Streamlit</p>", unsafe_allow_html=True)
+
