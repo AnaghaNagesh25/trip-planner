@@ -7,9 +7,9 @@ from dotenv import load_dotenv
 
 # Load API keys
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+OPENWEATHER_API_KEY = os.getenv("714ea86f8689ebafb30f12dd9c09cbaa")
+GOOGLE_API_KEY = os.getenv("AIzaSyDqztuqGS6N8ciIDlfWxW2CcuUQbFaXGfM")
+GEMINI_API_KEY = os.getenv("AIzaSyDqztuqGS6N8ciIDlfWxW2CcuUQbFaXGfM")
 
 # Configure Gemini
 genai.configure(api_key=GEMINI_API_KEY)
