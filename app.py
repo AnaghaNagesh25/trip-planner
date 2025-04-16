@@ -1,101 +1,72 @@
-import streamlit as st
-import requests
 import os
-from datetime import datetime, timedelta
+import streamlit as st
 from dotenv import load_dotenv
-from langchain.llms import GooglePalm
+from datetime import datetime, timedelta
+import requests
+from langchain.chat_models import ChatGoogleGenerativeAI
+from langchain.schema import HumanMessage
 
-# Load environment variables
+# Load API keys
 load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
-# Get API keys
-OPENWEATHER_API_KEY = os.getenv("714ea86f8689ebafb30f12dd9c09cbaa")
-GOOGLE_API_KEY = os.getenv("AIzaSyDqztuqGS6N8ciIDlfWxW2CcuUQbFaXGfM")
-GEMINI_API_KEY = os.getenv("AIzaSyDqztuqGS6N8ciIDlfWxW2CcuUQbFaXGfM")
+# LangChain LLM Setup
+llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=GEMINI_API_KEY)
 
-# Initialize Gemini LLM
-llm = GooglePalm(google_api_key=GEMINI_API_KEY)
-
-# Streamlit UI configuration
+# Streamlit fancy UI
 st.set_page_config(page_title="AI Trip Planner", layout="wide")
 st.markdown("""
     <style>
-    .main {
-        background: linear-gradient(to right, #e0f7fa, #fff3e0);
-        padding: 2rem;
-    }
-    .block-container {
-        max-width: 900px;
-        margin: auto;
-        background-color: #ffffff;
-        padding: 2rem;
-        border-radius: 1rem;
-        box-shadow: 0px 0px 15px rgba(0,0,0,0.1);
-    }
+    .main { background-color: #f9f9f9; }
+    .title { font-size:36px; font-weight:bold; color:#2c3e50; }
+    .section { background-color: white; padding:20px; border-radius:15px; margin-top:20px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🌍 AI-Powered Trip Planner")
-st.markdown("Plan your next adventure with the power of AI. Get suggestions for weather, attractions, flights, and hotels!")
+st.markdown("<div class='title'>✈️ AI Trip Planner</div>", unsafe_allow_html=True)
 
-# User Inputs
-city = st.text_input("Enter city name", "Tokyo")
-days = st.slider("Select number of days", 1, 7, 3)
-month = st.selectbox("Select travel month", ["January", "February", "March", "April", "May", "June", "July"])
+# Input
+city = st.text_input("Enter city (e.g., Tokyo)", value="Tokyo")
+days = st.slider("Trip duration (in days)", min_value=1, max_value=10, value=3)
+month = st.selectbox("Select month", ["April", "May", "June", "July", "August"])
+submit = st.button("Plan My Trip!")
 
-# Button to generate plan
-if st.button("Generate Trip Plan"):
+# Helper Functions
+def get_weather(city):
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
+    r = requests.get(url)
+    data = r.json()
+    if "main" in data:
+        return f"{data['weather'][0]['description'].capitalize()}, {data['main']['temp']}°C"
+    return "Weather info unavailable"
 
-    today = datetime.today()
-    month_index = ["January", "February", "March", "April", "May", "June", "July"].index(month) + 1
-    trip_start = today.replace(month=month_index, day=min(today.day, 28))
-    trip_end = trip_start + timedelta(days=days - 1)
+def get_places(city):
+    url = f"https://maps.googleapis.com/maps/api/place/textsearch/json?query=tourist+attractions+in+{city}&key={GOOGLE_API_KEY}"
+    r = requests.get(url)
+    data = r.json()
+    places = [place["name"] for place in data.get("results", [])[:5]]
+    return places if places else ["No data found"]
 
-    # LLM for cultural/historic intro
-    intro_prompt = f"Provide a 1-paragraph cultural and historical introduction for {city}."
-    trip_summary = llm.invoke(intro_prompt)
+# Main Logic
+if submit:
+    start_date = datetime(2025, list(["January", "February", "March", "April", "May", "June", "July", "August"]).index(month) + 1, 16)
+    end_date = start_date + timedelta(days=days - 1)
 
-    # Weather API call
-    weather_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-    weather_data = requests.get(weather_url).json()
+    with st.spinner("Talking to Gemini..."):
+        city_info = llm([HumanMessage(content=f"Tell me about the cultural and historical significance of {city}.")]).content
 
-    current_weather = "Error: Unable to fetch weather data."
-    if weather_data.get("main"):
-        temp = weather_data["main"]["temp"]
-        desc = weather_data["weather"][0]["description"]
-        current_weather = f"**{temp}°C**, {desc.capitalize()}"
-
-    # Google Places API for attractions
-    places_url = (
-        f"https://maps.googleapis.com/maps/api/place/textsearch/json?query=tourist+attractions+in+{city}&key={GOOGLE_API_KEY}"
-    )
-    places_data = requests.get(places_url).json()
-    places_list = []
-    if places_data.get("results"):
-        for place in places_data["results"][:5]:
-            places_list.append(f"**{place['name']}** - {place.get('formatted_address', 'No address available')}")
+    weather = get_weather(city)
+    places = get_places(city)
 
     # Display Results
-    st.subheader("🌍 Cultural & Historic Introduction")
-    st.markdown(trip_summary)
+    st.markdown(f"<div class='section'><h3>🗓️ Travel Dates</h3>{start_date.strftime('%B %d, %Y')} to {end_date.strftime('%B %d, %Y')}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section'><h3>🏙️ About {city}</h3>{city_info}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section'><h3>☁️ Current Weather</h3>{weather}</div>", unsafe_allow_html=True)
 
-    st.subheader("🗓️ Travel Dates")
-    st.markdown(f"**{trip_start.strftime('%B %d, %Y')}** to **{trip_end.strftime('%B %d, %Y')}**")
+    st.markdown(f"<div class='section'><h3>🌟 Top Attractions in {city}</h3><ul>" + "".join([f"<li>{p}</li>" for p in places]) + "</ul></div>", unsafe_allow_html=True)
 
-    st.subheader("☁️ Current Weather")
-    st.markdown(current_weather)
-
-    st.subheader("🌤️ Google Places (Top 5 Popular Attractions)")
-    if places_list:
-        for place in places_list:
-            st.markdown(f"- {place}")
-    else:
-        st.markdown("No places data found.")
-
-    st.subheader("✈️ Flight Options")
-    st.markdown("Flights are available from various international airports to this city.\nPlease check [Google Flights](https://www.google.com/travel/flights) for the latest prices and availability.")
-
-    st.subheader("🏨 Hotel Options")
-    st.markdown("We recommend checking out [Google Hotels](https://www.google.com/travel/hotels) or [Booking.com](https://www.booking.com) for the best deals.")
-
+    st.markdown(f"<div class='section'><h3>✈️ Flight Options</h3>Flights are available from major cities. Check Google Flights or Skyscanner for best deals.</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section'><h3>🏨 Hotel Options</h3>Check Google Hotels, Booking.com, or Airbnb for accommodation near top attractions.</div>", unsafe_allow_html=True)
 
