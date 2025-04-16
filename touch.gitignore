@@ -1,1 +1,15 @@
 touch .gitignore
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+
+# Ignore virtual environment folders
+venv/
+.env/
+
+# Ignore IDE config files (optional)
+.vscode/
+.idea/
+
+# Ignore system-specific files
+.DS_Store
